@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const uploadDir = "./uploading"
+const uploadDir = "../uploading"
 
 func enableCors(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
