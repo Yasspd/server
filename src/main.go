@@ -6,9 +6,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
-const uploadDir = "../uploading"
+const uploadDir = "./uploading"
 
 type FileHandler struct {
 	storage *StorageService
@@ -55,7 +56,7 @@ func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		file,
 	)
 	if err != nil {
-		http.Error(w, "Не получилось сохранить файл в хранилище", http.StatusBadRequest)
+		http.Error(w, "Не получилось сохранить файл в хранилище"+err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -75,7 +76,15 @@ func main() {
 		return
 	}
 	repo := NewFileRepository(pool)
-	repo.InitShema(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := repo.InitSchema(ctx); err != nil {
+		log.Fatalf("Критическая ошибка: не удалось создать таблицу files: %v", err)
+	}
+	log.Println("Таблица files успешно проверена/создана в БД")
+
+	repo.InitSchema(context.Background())
 	storage := NewStorageService(repo, uploadDir)
 	handler := NewFileHandler(storage)
 	http.HandleFunc("/api/v1/upload", enableCors(handler.Upload))

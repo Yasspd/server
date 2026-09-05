@@ -24,20 +24,20 @@ type FileRepo struct {
 func NewFileRepository(pool *pgxpool.Pool) *FileRepo {
 	return &FileRepo{pool: pool}
 }
-func (r *FileRepo) InitShema(ctx context.Context) error {
-	query :=
-		`CREATE TABLE IF NOT EXIST files (
-			id SERIAL PRIMARY KEY
-			filename TEXT IS NOT NULL
-			filepath TEXT IS NOT NULL
-			size BIGINT NOT NULL
-			mimetype TEXT IS NOT NULL
-			sha256 TEXT IS NOT NULL 
-			created_at TIMESTEP WHIT TIME ZONE DEFAULT NOW()
-		);`
+func (r *FileRepo) InitSchema(ctx context.Context) error {
+	query := `
+	CREATE TABLE IF NOT EXISTS files (
+		id SERIAL PRIMARY KEY,
+		file_name TEXT NOT NULL,
+		file_path TEXT NOT NULL,
+		size BIGINT NOT NULL,
+		mime_type TEXT NOT NULL,
+		sha256 TEXT NOT NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+	);`
 	_, err := r.pool.Exec(ctx, query)
 	if err != nil {
-		return fmt.Errorf("ошибка создания файла в бд", err)
+		return fmt.Errorf("ошибка создания файла в бд: %w", err)
 	}
 	return nil
 }
@@ -52,19 +52,19 @@ func (r *FileRepo) Save(ctx context.Context, meta *FileMetadata) error {
 		query,
 		meta.FileName, // $1
 		meta.FilePath, // $2
+		meta.Size,     // $5
 		meta.MIMEType, // $3
 		meta.SHA256,   // $4
-		meta.Size,     // $5
 	).Scan(&meta.ID, &meta.CreatedAt)
 	if err != nil {
-		return fmt.Errorf("не получилось скопировать данные в бд: ", err)
+		return fmt.Errorf("не получилось скопировать данные в бд: %w", err)
 	}
 	return nil
 }
 func (r *FileRepo) GetById(ctx context.Context, id int) (*FileMetadata, error) {
 	query := `
-		SELECT id, file_name, file_path, size, mime_type, sha256, created_at
-		FROM files
+		SELECT id, file_name, file_path, size, mime_type, sha256, created_at,
+		FROM files,
 		WHERE id = $1;
 	`
 
