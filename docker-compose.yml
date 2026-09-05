@@ -1,0 +1,16 @@
+services:
+  postgres_db:
+    image: postgres:16-alpine
+    container_name: Data_cloud
+    restart: always
+    environment:
+      POSTGRES_USER: petya_db
+      POSTGRES_PASSWORD: arelun06_db
+      POSTGRES_DB: Data_cloud
+    ports:
+      - "5666:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

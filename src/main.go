@@ -1,16 +1,22 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
-	"time"
 )
 
 const uploadDir = "../uploading"
+
+type FileHandler struct {
+	storage *StorageService
+}
+
+func NewFileHandler(storage *StorageService) *FileHandler {
+	return &FileHandler{storage: storage}
+}
 
 func enableCors(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -26,51 +32,53 @@ func enableCors(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func HandlerUpload(w http.ResponseWriter, r *http.Request) {
+func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "метод не поддерживается", http.StatusMethodNotAllowed)
-	}
-
-	err := r.ParseMultipartForm(10 << 10)
-	if err != nil {
-		http.Error(w, "Максимальный обьем файла не должно превышать больше 10мб"+err.Error(), http.StatusBadRequest)
+		http.Error(w, "не тот формат запроса", http.StatusBadRequest)
 		return
 	}
-
+	if err := r.ParseMultipartForm(10 << 10); err != nil {
+		http.Error(w, "файл больше 10мб"+err.Error(), http.StatusBadRequest)
+		return
+	}
 	file, handler, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, "не верный тип файла", http.StatusBadRequest)
+		http.Error(w, "не получилось получить файл"+err.Error(), http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
-	log.Printf("получен файл, размер: %d байт", handler.Filename, handler.Size)
-
-	safeFileName := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(handler.Filename))
-	dstPath := filepath.Join(uploadDir, safeFileName)
-	dst, err := os.Create(dstPath)
+	meta, err := h.storage.SaveUploadedFile(
+		r.Context(),
+		handler.Filename,
+		handler.Header.Get("Context-type"),
+		file,
+	)
 	if err != nil {
-		http.Error(w, "не получилось создать файл на сервере"+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Не получилось сохранить файл в хранилище", http.StatusBadRequest)
 		return
 	}
-	defer dst.Close()
 
-	Writenbytes, err := io.Copy(dst, file)
-	if err != nil {
-		http.Error(w, "Ошибка записи потока на диск: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	log.Printf("Успешно сохранено: %s (%d байт)", dstPath, Writenbytes)
-
+	w.Header().Set("Context-type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(fmt.Sprintf(`{"status":"ok", "filename":"%s"}`, safeFileName)))
+	w.Write([]byte(fmt.Sprintf(`{"status":"ok", "id":%d, "sha256":"%s"}`, meta.ID, meta.SHA256)))
 }
 
 func main() {
 	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
 		log.Fatalf("Не удалось создать папку загрузок: %v", err)
 	}
-	http.HandleFunc("/api/v1/upload", enableCors(HandlerUpload))
+	dsn := "postgres://petya_db:arelun06_db@localhost:5666/Data_cloud"
+	pool, err := ConnectionDB(dsn)
+	if err != nil {
+		fmt.Errorf("не получилось подключится к базе данных", err)
+		return
+	}
+	repo := NewFileRepository(pool)
+	repo.InitShema(context.Background())
+	storage := NewStorageService(repo, uploadDir)
+	handler := NewFileHandler(storage)
+	http.HandleFunc("/api/v1/upload", enableCors(handler.Upload))
 	fmt.Println("Storage Service запущен на порту :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Ошибка сервера: %v", err)

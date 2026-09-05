@@ -21,7 +21,7 @@ type FileRepo struct {
 	pool *pgxpool.Pool
 }
 
-func Repository(pool *pgxpool.Pool) *FileRepo {
+func NewFileRepository(pool *pgxpool.Pool) *FileRepo {
 	return &FileRepo{pool: pool}
 }
 func (r *FileRepo) InitShema(ctx context.Context) error {
