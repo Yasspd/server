@@ -39,7 +39,7 @@ func (h *FileHandler) Streamfile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
 		return
 	}
-	// получаем id с url и переводим из строки в число
+
 	idstr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idstr)
 	if err != nil {
