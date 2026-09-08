@@ -25,7 +25,7 @@ func NewStorageService(repo *FileRepo, uploadDir string) *StorageService {
 
 func (s *StorageService) GetFileForStream(ctx context.Context, id int) (*os.File, *FileMetadata, error) {
 	// сначало мы берем файл из бд
-	meta, err := s.repo.GetFileById(ctx, id)
+	meta, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Не найден файл: %w" + err.Error())
 
