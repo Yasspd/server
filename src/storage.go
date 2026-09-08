@@ -23,6 +23,22 @@ func NewStorageService(repo *FileRepo, uploadDir string) *StorageService {
 	}
 }
 
+func (s *StorageService) GetFileForStream(ctx context.Context, id int) (*os.File, *FileMetadata, error) {
+	// сначало мы берем файл из бд
+	meta, err := s.repo.GetFileById(ctx, id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Не найден файл: %w" + err.Error())
+
+	}
+	// открываем файл в режиме чтения
+	readFile, err := os.Open(meta.FilePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Файл не найден на диске или не удалось его прочитать: %w" + err.Error())
+	}
+	// отдаем файл, метаданные файла и статус ок
+	return readFile, meta, nil
+}
+
 func (s *StorageService) SaveUploadedFile(
 	ctx context.Context,
 	fileName string,
@@ -30,31 +46,31 @@ func (s *StorageService) SaveUploadedFile(
 	src io.Reader,
 ) (*FileMetadata, error) {
 
-	// 1. Формируем уникальное имя и полный путь на диске
+	//Формируем уникальное имя и полный путь на диске
 	safeName := fmt.Sprintf("%d_%s", time.Now().Unix(), filepath.Base(fileName))
 	fullPath := filepath.Join(s.uploadDir, safeName)
 
-	// 2. Создаем файл на диске
+	// Создаем файл на диске
 	dst, err := os.Create(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("не удалось создать файл на диске: %w", err)
 	}
 	defer dst.Close()
 
-	// 3. Создаем хэшер и тройник TeeReader
+	// Создаем хэшер и тройник TeeReader
 	hasher := sha256.New()
 	tee := io.TeeReader(src, hasher)
 
-	// 4. Потоковая запись: читает из tee -> считает хэш -> пишет в dst
+	// Потоковая запись: читает из tee -> считает хэш -> пишет в dst
 	size, err := io.Copy(dst, tee)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка записи потока данных: %w", err)
 	}
 
-	// 5. Фиксируем SHA-256 хэш
+	// Фиксируем SHA-256 хэш
 	hashSum := hex.EncodeToString(hasher.Sum(nil))
 
-	// 6. Формируем объект метаданных и сохраняем в базу данных
+	// Формируем объект метаданных и сохраняем в базу данных
 	meta := &FileMetadata{
 		FileName: fileName,
 		FilePath: fullPath,

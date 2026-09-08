@@ -61,7 +61,7 @@ func (r *FileRepo) Save(ctx context.Context, meta *FileMetadata) error {
 	}
 	return nil
 }
-func (r *FileRepo) GetById(ctx context.Context, id int) (*FileMetadata, error) {
+func (r *FileRepo) GetFileById(ctx context.Context, id int) (*FileMetadata, error) {
 	query := `
 		SELECT id, file_name, file_path, size, mime_type, sha256, created_at,
 		FROM files,

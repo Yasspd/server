@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -33,9 +34,33 @@ func enableCors(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func (h *FileHandler) Streamfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
+		return
+	}
+	// получаем id с url и переводим из строки в число
+	idstr := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(idstr)
+	if err != nil {
+		http.Error(w, " не получилось найти файл по id", http.StatusBadRequest)
+		return
+	}
+	file, meta, err := h.storage.GetFileForStream(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	defer file.Close()
+	if meta.MIMEType != "" {
+		w.Header().Set("Context-type", meta.MIMEType)
+	}
+
+	http.ServeContent(w, r, meta.FileName, meta.CreatedAt, file)
+}
+
 func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "не тот формат запроса", http.StatusBadRequest)
+		http.Error(w, "не тот формат запроса", http.StatusMethodNotAllowed)
 		return
 	}
 	if err := r.ParseMultipartForm(10 << 10); err != nil {
@@ -88,6 +113,7 @@ func main() {
 	storage := NewStorageService(repo, uploadDir)
 	handler := NewFileHandler(storage)
 	http.HandleFunc("/api/v1/upload", enableCors(handler.Upload))
+	http.HandleFunc("/api/v1/stream/id", enableCors(handler.Streamfile))
 	fmt.Println("Storage Service запущен на порту :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Ошибка сервера: %v", err)
