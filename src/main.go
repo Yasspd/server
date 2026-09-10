@@ -98,7 +98,7 @@ func main() {
 	dsn := "postgres://petya_db:arelun06_db@localhost:5666/Data_cloud"
 	pool, err := ConnectionDB(dsn)
 	if err != nil {
-		fmt.Errorf("не получилось подключится к базе данных", err)
+		log.Fatalf("не удалось подключиться к базе данных: %v", err)
 		return
 	}
 	repo := NewFileRepository(pool)

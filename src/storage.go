@@ -26,12 +26,12 @@ func NewStorageService(repo *FileRepo, uploadDir string) *StorageService {
 func (s *StorageService) GetFileForStream(ctx context.Context, id int) (*os.File, *FileMetadata, error) {
 	meta, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Не найден файл: %w" + err.Error())
+		return nil, nil, fmt.Errorf("Не найден файл: %w", err)
 
 	}
 	readFile, err := os.Open(meta.FilePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Файл не найден на диске или не удалось его прочитать: %w" + err.Error())
+		return nil, nil, fmt.Errorf("Файл не найден на диске или не удалось его прочитать: %w", err)
 	}
 	return readFile, meta, nil
 }
